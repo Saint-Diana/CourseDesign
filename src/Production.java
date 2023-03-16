@@ -1,10 +1,20 @@
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * 产生式数据结构
+ *
+ * @author 沈慧昌
+ * @date 2022年12月22日12:07:41
+ */
 public class Production {
+    //产生式左部
     private String left;
+    //产生式右部
     private String[] right;
+    //产生式：例如S'->S
     private String string;
+    //记录了每个产生式'.'所在的位置      例如 E -> E +. E  那么这个产生式的position = 2
     private int position;
 
 

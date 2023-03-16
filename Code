@@ -1,43 +1,9 @@
-if(a>b+1){
-   i=(i+1.1)*2;
-   if(a>b+1){
-      i=(i+1.1)*2;
-         }else{
-
-   i= i *3;
-   }
-if(a>b+1){
-   i=(i+1.1)*2;
-      }else{
-
-i= i *3;
-}
-if(a>b+1){
-   i=(i+1.1)*2;
-      }else{
-
-i= i *3;
-}
-if(a>b+1){
-   i=(i+1.1)*2;
-      }else{
-
-i= i *3;
-}
-if(a>b+1){
-   i=(i+1.1)*2;
-      }else{
-
-i= i *3;
-}
-if(a>b+1){
-   i=(i+1.1)*2;
-      }else{
-
-i= i *3;
-}
-
-      }else{
-
-i= i *3;
+if(a>b){
+    if(a>c){
+      a = a + b;
+    }else{
+	   a = a - b;
+    }
+}else{
+    a = a + c;
 }

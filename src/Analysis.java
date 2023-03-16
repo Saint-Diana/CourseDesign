@@ -1,19 +1,38 @@
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+/**
+ * 采用SLR(1)自底向上语法分析方法
+ *      构造SLR(1)项目集族
+ *
+ * @author 沈慧昌
+ * @date 2022年12月23日08:32:15
+ */
 public class Analysis {
-
+    //项目集，记录了文法对应DFA中的所有项目集，项目集的形式是   <Ix, {当前项目集Ix中的所有产生式}>
     HashMap<String, List<Production>> itemSet;
+    //词法分析结果
     Lex lex;
+    //产生式集合
     List<Production> productions;
+    //终结符
     List<String> terminals;
+    //非终结符
     List<String> nonterminals;
+    //用于判断闭包运算是否结束
     List<Production> endList;
-    private List<Object> leftEnd;
-    private List<Object> rightEnd;
+    private final List<Object> leftEnd;
+    private final List<Object> rightEnd;
+    //语法分析构造的DFA，DFA的key是状态；value也是一个HashMap，value的key是输入符号；value的value是当前状态接受输入符号后的目标状态
+    //DFA的value的key组成的集合就是当前项目集的输入符号集
     HashMap<String, HashMap<String, String>> DFA;
 
 
@@ -28,59 +47,37 @@ public class Analysis {
         rightEnd = new ArrayList<>();
         DFA = new HashMap<>();
 
+        //读取文法文件，在设置产生式集合productions的同时，根据产生式的左部设置非终结符集nonterminals
         readFile();
+        //设置终结符集terminals
         setTerminals();
+        //根据文法生成SLR(1)项目集族
         setItemSet();
-
-
     }
 
 
     private void readFile() {
         try {
-            InputStream is = new FileInputStream("Gramma");
-
+            //读取文法文件"Grammar"
+            InputStream is = Files.newInputStream(Paths.get("Grammar"));
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            //文法产生式左部
             String left;
+            //文法产生式右部
             String[] rights;
+            //读取的一行产生式
             String line;
-            int count = 0;
-            List<Production> temp = new ArrayList<>();
+            //遍历整个文法
             while ((line = reader.readLine()) != null) {
                 left = line.split("->")[0].trim();
                 String s = line.split("->")[1];
-
                 rights = s.trim().split("\\|");
-                for (String right :
-                        rights) {
-//                    if (right.contains("<")) {
-//                        String s1 = "";
-//                        List<String> strings = Arrays.asList(right.split(""));
-//                        for (int i = 0; i < strings.size(); i++) {
-//                            if (i >= strings.indexOf("<") && i <= strings.indexOf(">")) {
-//                                s1 += (strings.get(i));
-//                            }
-//                        }
-//
-//                        String[] strings1 = lex.Lex.get(s1).toArray(new String[0]);
-//                        if(strings1.length == 0){
-//                            Production production = new Production(right, right.trim().split(" "), left + " -> " + right.trim());
-//                            productions.add(production);
-//                        }
-//                        for (String op :
-//                                strings1) {
-//
-//                            Production production = new Production(left,right.replace(s1,op).trim().split(" ") , left + " -> " + right.replace(s1,op).trim());
-//                            productions.add(production);
-//                        }
-//
-//
-//                    } else {
+                //因为一行产生式实际上可能是多个产生式的缩略写法，所以我们这里需要将其展开为多个产生式添加到productions集合中
+                for (String right : rights) {
                     Production production = new Production(left, right.trim().split(" "), left + " -> " + right.trim());
                     productions.add(production);
-
                 }
-
+                //因为产生式左部肯定是非终结符，所以如果这条产生式的左部非终结符不在非终结符集里的话，就将其添加进去。
                 if (!nonterminals.contains(left)) {
                     nonterminals.add(left);
                 }
@@ -93,23 +90,35 @@ public class Analysis {
     }
 
     private void setTerminals() {
+        //根据产生式的右部来设置终结符集
         String[] right;
         for (Production production :
                 productions) {
+            //获取每条产生式的右部
             right = production.getRight();
             for (String st :
                     right) {
+                //如果不是非终结符且终结符集中不含该终结符，则将其添加进去！
                 if (!(nonterminals.contains(st)) && !terminals.contains(st))
                     terminals.add(st);
             }
         }
+        //额外需要添加一个"#"作为输入串的结束符
         terminals.add("#");
     }
 
+    /**
+     * 构造项目集
+     */
     private void setItemSet() {
+        //对基本项目集进行闭包运算
         List<Production> closure = new ArrayList<>();
+        //产生式右部
         List<String> rights;
+        //产生式
         Production production;
+        //首先构造I0，需要先手动找到开始符为产生式左部的产生式，然后将其加入闭包
+        //遍历每一条产生式，如果产生式的左部是文法的开始符S'，则这些产生式是基本项目集中的元素，所以需要添加到closure中！
         for (Production pro :
                 productions) {
             if (pro.getLeft().equals(productions.get(0).getLeft())) {
@@ -117,24 +126,30 @@ public class Analysis {
             }
         }
         itemSet.put("I0", closure);
+        //进行闭包运算
         for (int i = 0; i < itemSet.size(); i++) {
             closure = itemSet.get("I" + i);
+            //记录闭包中所有项目的左部非终结符
             rights = new ArrayList<>();
             for (int j = 0; j < closure.size(); j++) {
+                //闭包中的第j条产生式/项目
                 production = closure.get(j);
+                //如果不是归约项目
                 if (production.getPosition() != production.getRight().length) {
+                    //找到'.'后的那个字符，然后判断该字符是否为非终结符，如果是非终结符且未处理过，就将以这个非终结符为产生式左部的所有产生式都添加到闭包中！
+                    //直到所有相关的项目都加入闭包为止
                     String right_pos = production.getRight()[production.getPosition()];
                     if (nonterminals.contains(right_pos) && !rights.contains(right_pos)) {
                         closure.addAll(getProdByLeft(right_pos));
                         rights.add(right_pos);
                     }
                 }
-
             }
 
-
             rights = new ArrayList<>();
+            //遍历闭包中的项目
             for (Production value : closure) {
+                //如果不是归约项目且当前项目还未处理
                 if (value.getPosition() != value.getRight().length && !rights.contains(value.getRight()[value.getPosition()])) {
                     rights.add(value.getRight()[value.getPosition()]);
                 }
@@ -143,8 +158,8 @@ public class Analysis {
             HashMap<String, String> DFAString = new HashMap<>();
             for (String right : rights) {
                 List<Production> temp = new ArrayList<>();
-                for (Production pro :
-                        closure) {
+                //现在闭包中已经加入了基本项目，开始进行运算。
+                for (Production pro : closure) {
                     if (pro.getPosition() != pro.getRight().length && pro.getRight()[pro.getPosition()].equals(right)) {
                         Production production1 = new Production(pro, pro.getPosition());
                         if (production1.getPosition() != production1.getRight().length) {
@@ -163,15 +178,11 @@ public class Analysis {
                         String id = getID(temp);
                         DFAString.put(right, id);
                     }
-
-
                 }
             }
             DFA.put("I" + i, DFAString);
             isEnd();
         }
-
-
     }
 
     private List<Production> getItem(List<Production> temp) {
@@ -189,11 +200,8 @@ public class Analysis {
     }
 
     private void isEnd() {
-
-        for (List<Production> tempList :
-                itemSet.values()) {
-            for (Production production :
-                    tempList) {
+        for (List<Production> tempList : itemSet.values()) {
+            for (Production production : tempList) {
                 if (production.getPosition() == production.getRight().length) {
                     if (!(leftEnd.contains(production.getLeft()) && rightEnd.contains(production.getRight()))) {
                         leftEnd.add(production.getLeft());
@@ -205,7 +213,12 @@ public class Analysis {
         }
     }
 
-
+    /**
+     * 根据产生式左部非终结符，获取所有产生式左部为left的产生式集合
+     *
+     * @param left 产生式左部非终结符
+     * @return 所有产生式左部为left的产生式集合
+     */
     private List<Production> getProdByLeft(String left) {
         List<Production> productionList = new ArrayList<>();
         for (Production production : productions) {
@@ -216,9 +229,10 @@ public class Analysis {
         return productionList;
     }
 
+
     public int getCount(Production production) {
-        for (Production pro :
-                productions) {
+        //返回产生式production在产生式集合productions中的位置！
+        for (Production pro : productions) {
             if (pro.getLeft().equals(production.getLeft()) && Arrays.equals(pro.getRight(), production.getRight())) {
                 return productions.indexOf(pro);
             }
